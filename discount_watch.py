@@ -48,7 +48,35 @@ class DiscountDeal:
     title: str
     link: str
     price: float | None
-    discount: int  # percent off
+    discount: int  # percent off (100 for free)
+    free: bool = False
+
+
+# "FREE" as the price - not "Free Shipping", "+ Free Gift Card", "Sugar-Free", ...
+FREE_WORD = re.compile(r"(?<![-\w])free\b", re.I)
+NOT_FREE_AFTER = re.compile(
+    r"^\W*(shipping|ship|s/h|s&h|delivery|returns?|store pickup|pickup|in-store pickup|trial|"
+    r"\$|gift card|gc\b|w/|with)", re.I,
+)
+NOT_FREE_BEFORE = re.compile(
+    r"(\+|w/|with|and|&|plus|gluten|sugar|hands|tax|fat|cord|bpa|worry|duty|hassle|interest|"
+    r"fee|ad|scent|fragrance|toll|lactose|dairy|cruelty|caffeine|wire|cable|rust|drip)\s*$", re.I,
+)
+
+
+def is_free(title: str) -> bool:
+    """True when the post is a freebie: "FREE Game on Epic", "Free Sample ...", "$0"."""
+    if re.search(r"\btrial\b", title, re.I):  # "Free 3-month trial" is not a freebie
+        return False
+    if re.search(r"\$\s?0(?:\.00)?(?![\d.])", title):
+        return True
+    for m in FREE_WORD.finditer(title):
+        if NOT_FREE_AFTER.search(title[m.end():m.end() + 20]):
+            continue
+        if NOT_FREE_BEFORE.search(title[max(0, m.start() - 12):m.start()]):
+            continue
+        return True
+    return False
 
 
 def is_brand_product(title: str) -> bool:
@@ -96,6 +124,32 @@ def find_deals(cfg: dict) -> list[DiscountDeal]:
             if d.posted and (datetime.now(timezone.utc) - d.posted).total_seconds() > max_age_h * 3600:
                 continue
             if not is_brand_product(d.title):
+                continue
+            pct = discount_percent(d.title, d.price)
+            if pct is not None and pct >= min_pct:
+                result.append(DiscountDeal(d.id, d.title, d.link, d.price, pct))
+    return result
+
+
+def find_hot_deals(cfg: dict) -> list[DiscountDeal]:
+    """Any new Slickdeals post (any product) at >= min_discount% off, or FREE."""
+    min_pct = int(cfg.get("min_discount", 70))
+    want_free = cfg.get("include_free", True)
+    max_age_h = float(cfg.get("max_age_hours", 24))
+    seen_ids = set()
+    result = []
+    for url in cfg.get("feeds") or slickdeals.ALL_DEALS_FEEDS:
+        for d in slickdeals.read_feed(url):
+            if d.id in seen_ids or d.title in seen_ids:
+                continue
+            seen_ids.update((d.id, d.title))
+            if d.posted and (datetime.now(timezone.utc) - d.posted).total_seconds() > max_age_h * 3600:
+                continue
+            t = d.title.lower()
+            if any(re.search(rf"\b{re.escape(w)}\b", t) for w in CONDITION_WORDS):
+                continue
+            if want_free and is_free(d.title):
+                result.append(DiscountDeal(d.id, d.title, d.link, 0.0, 100, free=True))
                 continue
             pct = discount_percent(d.title, d.price)
             if pct is not None and pct >= min_pct:

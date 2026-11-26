@@ -25,6 +25,11 @@ settings:
     min_discount: 50                 # percent off
     queries: [Apple, AirPods, iPad, MacBook, iPhone]
 
+  # Alert for ANY new Slickdeals post (any product) that is 70% off or more, or FREE.
+  hot_deals:
+    min_discount: 70                 # percent off
+    include_free: true               # also alert for freebies (not "free shipping")
+
 
 # ---------------------------------------------------------------------------
 # ADVANCED (optional): also check exact store pages every 15 minutes.

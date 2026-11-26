@@ -52,8 +52,19 @@ def _price_in_title(title: str) -> float | None:
     return None
 
 
+# Every new deal, not tied to a search: front page deals + the Hot Deals forum
+ALL_DEALS_FEEDS = (
+    "https://slickdeals.net/newsearch.php?mode=frontpage&searcharea=deals&searchin=first&rss=1",
+    "https://slickdeals.net/forums/external.php?type=RSS2&forumids=9",
+)
+
+
 def search(query: str) -> list[SlickDeal]:
-    xml = fetch(FEED.format(q=quote_plus(query)))
+    return read_feed(FEED.format(q=quote_plus(query)))
+
+
+def read_feed(url: str) -> list[SlickDeal]:
+    xml = fetch(url)
     root = ET.fromstring(xml.encode("utf-8") if isinstance(xml, str) else xml)
     deals = []
     for item in root.iter("item"):

@@ -35,6 +35,7 @@ DEFAULT_SETTINGS = {
     "max_workers": 8,
     "search_stores": ["Walmart", "Target"],  # stores searched by product name
     "discount_watch": None,   # e.g. {"brand": "Apple", "min_discount": 50}
+    "hot_deals": None,        # e.g. {"min_discount": 70, "include_free": True}
 }
 
 
@@ -234,16 +235,31 @@ def check_slickdeals(product: dict, state: dict, settings: dict, dry_run: bool) 
 
 
 def check_discount_watch(settings: dict, state: dict, dry_run: bool) -> None:
-    cfg = settings.get("discount_watch")
-    if not cfg or cfg.get("enabled", True) is False:
-        return
-    brand = cfg.get("brand", "Apple")
-    min_pct = int(cfg.get("min_discount", 50))
+    """Brand watch (any Apple product 50%+ off) and hot deals (anything 70%+ off or FREE)."""
+    brand_cfg = settings.get("discount_watch")
+    if brand_cfg and brand_cfg.get("enabled", True) is not False:
+        brand = brand_cfg.get("brand", "Apple")
+        _alert_posts(
+            f"Any {brand} product", f"discount:{brand}", brand,
+            int(brand_cfg.get("min_discount", 50)), lambda: discount_watch.find_deals(brand_cfg),
+            brand_cfg, settings, state, dry_run,
+        )
+    hot_cfg = settings.get("hot_deals")
+    if hot_cfg and hot_cfg.get("enabled", True) is not False:
+        _alert_posts(
+            "Any product", "hot_deals", "Slickdeals",
+            int(hot_cfg.get("min_discount", 70)), lambda: discount_watch.find_hot_deals(hot_cfg),
+            hot_cfg, settings, state, dry_run,
+        )
+
+
+def _alert_posts(heading, state_key, label_name, min_pct, finder, cfg, settings, state, dry_run) -> None:
     label = f"{'Slickdeals':<12}"
-    seen = state.setdefault("slickdeals", {}).setdefault(f"discount:{brand}", [])
-    print(f"\nAny {brand} product  (Slickdeals posts >= {min_pct}% off)")
+    seen = state.setdefault("slickdeals", {}).setdefault(state_key, [])
+    extra = " or FREE" if state_key == "hot_deals" and cfg.get("include_free", True) else ""
+    print(f"\n{heading}  (Slickdeals posts >= {min_pct}% off{extra})")
     try:
-        deals = discount_watch.find_deals(cfg)
+        deals = finder()
     except Exception as exc:
         print(f"  {label} ERROR  {type(exc).__name__}: {str(exc)[:160]}")
         return
@@ -252,35 +268,39 @@ def check_discount_watch(settings: dict, state: dict, dry_run: bool) -> None:
         print(f"  {label} {len(deals)} matching post(s), none new")
         return
     new.sort(key=lambda d: -d.discount)
+
+    def tag(d):
+        return "FREE" if d.free else f"{d.discount}% off {money(d.price)}"
+
     for d in new:
-        print(f"  {label} {d.discount}% off  {money(d.price)}  NEW POST: {d.title[:90]}")
+        print(f"  {label} {tag(d)}  NEW POST: {d.title[:90]}")
     if dry_run:
         print(f"  {label} (dry run - would send 1 notification for {len(new)} post(s))")
         return
     best = new[0]
     if len(new) == 1:
-        title = f"{best.discount}% off {brand}: {money(best.price)}"
+        title = f"{label_name}: {tag(best)}"
         body = f"{best.title}\nTap to open the deal post."
     else:
-        title = f"{len(new)} {brand} deals {min_pct}%+ off (best {best.discount}%)"
-        body = "\n".join(f"- {d.discount}% off {money(d.price)}: {d.title[:80]}" for d in new[:8])
+        title = f"{label_name}: {len(new)} new deals (best: {tag(best)})"
+        body = "\n".join(f"- {tag(d)}: {d.title[:80]}" for d in new[:8])
         if len(new) > 8:
             body += f"\n...and {len(new) - 8} more"
-        body += "\nTap to open the biggest discount."
+        body += "\nTap to open the top one."
     sent = notifier.send(
         title, body, click_url=best.link, priority=cfg.get("priority", "urgent"),
-        tags="apple,moneybag", server=settings["ntfy_server"],
+        tags="moneybag,fire", server=settings["ntfy_server"],
     )
     print(f"  {label} 1 notification for {len(new)} post(s) -> {'sent' if sent else 'FAILED'}")
     if sent:
         seen.extend(d.id for d in new)
-    del seen[:-300]
+    del seen[:-500]
 
 
 def run_once(config_path: Path, state_path: Path, dry_run: bool) -> int:
     settings, products = load_config(config_path)
     state = load_state(state_path)
-    if not products and not settings.get("discount_watch"):
+    if not products and not (settings.get("discount_watch") or settings.get("hot_deals")):
         print("No products configured in products.yaml")
         return 0
 
