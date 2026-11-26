@@ -23,8 +23,8 @@ def send(
     token: str | None = None,
 ) -> bool:
     server = (server or os.environ.get("NTFY_SERVER") or "https://ntfy.sh").rstrip("/")
-    topic = topic or os.environ.get("NTFY_TOPIC")
-    token = token or os.environ.get("NTFY_TOKEN")
+    topic = (topic or os.environ.get("NTFY_TOPIC") or "").strip().strip("/")
+    token = (token or os.environ.get("NTFY_TOKEN") or "").strip()
     if not topic:
         print("  [ntfy] NTFY_TOPIC is not set - notification skipped:")
         print(f"         {title}: {message}")
