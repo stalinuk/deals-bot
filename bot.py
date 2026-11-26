@@ -18,6 +18,7 @@ from pathlib import Path
 
 import yaml
 
+import discount_watch
 import link_finder
 import notifier
 from matching import DEFAULT_EXCLUDE, keyword_patterns, title_matches
@@ -33,6 +34,7 @@ DEFAULT_SETTINGS = {
     "error_alert_after": 12,  # consecutive failed checks before warning (12 x 15 min = 3 h)
     "max_workers": 8,
     "search_stores": ["Walmart", "Target"],  # stores searched by product name
+    "discount_watch": None,   # e.g. {"brand": "Apple", "min_discount": 50}
 }
 
 
@@ -231,10 +233,54 @@ def check_slickdeals(product: dict, state: dict, settings: dict, dry_run: bool) 
     del seen[:-300]  # keep the list small
 
 
+def check_discount_watch(settings: dict, state: dict, dry_run: bool) -> None:
+    cfg = settings.get("discount_watch")
+    if not cfg or cfg.get("enabled", True) is False:
+        return
+    brand = cfg.get("brand", "Apple")
+    min_pct = int(cfg.get("min_discount", 50))
+    label = f"{'Slickdeals':<12}"
+    seen = state.setdefault("slickdeals", {}).setdefault(f"discount:{brand}", [])
+    print(f"\nAny {brand} product  (Slickdeals posts >= {min_pct}% off)")
+    try:
+        deals = discount_watch.find_deals(cfg)
+    except Exception as exc:
+        print(f"  {label} ERROR  {type(exc).__name__}: {str(exc)[:160]}")
+        return
+    new = [d for d in deals if d.id not in seen]
+    if not new:
+        print(f"  {label} {len(deals)} matching post(s), none new")
+        return
+    new.sort(key=lambda d: -d.discount)
+    for d in new:
+        print(f"  {label} {d.discount}% off  {money(d.price)}  NEW POST: {d.title[:90]}")
+    if dry_run:
+        print(f"  {label} (dry run - would send 1 notification for {len(new)} post(s))")
+        return
+    best = new[0]
+    if len(new) == 1:
+        title = f"{best.discount}% off {brand}: {money(best.price)}"
+        body = f"{best.title}\nTap to open the deal post."
+    else:
+        title = f"{len(new)} {brand} deals {min_pct}%+ off (best {best.discount}%)"
+        body = "\n".join(f"- {d.discount}% off {money(d.price)}: {d.title[:80]}" for d in new[:8])
+        if len(new) > 8:
+            body += f"\n...and {len(new) - 8} more"
+        body += "\nTap to open the biggest discount."
+    sent = notifier.send(
+        title, body, click_url=best.link, priority=cfg.get("priority", "urgent"),
+        tags="apple,moneybag", server=settings["ntfy_server"],
+    )
+    print(f"  {label} 1 notification for {len(new)} post(s) -> {'sent' if sent else 'FAILED'}")
+    if sent:
+        seen.extend(d.id for d in new)
+    del seen[:-300]
+
+
 def run_once(config_path: Path, state_path: Path, dry_run: bool) -> int:
     settings, products = load_config(config_path)
     state = load_state(state_path)
-    if not products:
+    if not products and not settings.get("discount_watch"):
         print("No products configured in products.yaml")
         return 0
 
@@ -280,6 +326,7 @@ def run_once(config_path: Path, state_path: Path, dry_run: bool) -> int:
     for product in products:
         if product.get("slickdeals"):
             check_slickdeals(product, state, settings, dry_run)
+    check_discount_watch(settings, state, dry_run)
 
     # forget state for products/links that were removed from the config
     live = {key for _, key, _, _ in jobs}

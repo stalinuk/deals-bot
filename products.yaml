@@ -18,6 +18,13 @@ settings:
   error_alert_after: 12          # ...after 12 failed checks in a row (~3 h at 15 min)
   search_stores: [Walmart, Target]   # stores searched by product name every 15 min
 
+  # Alert for ANY Apple product posted on Slickdeals at 50% off or more,
+  # even if it isn't in your products list above.
+  discount_watch:
+    brand: Apple
+    min_discount: 50                 # percent off
+    queries: [Apple, AirPods, iPad, MacBook, iPhone]
+
 
 # ---------------------------------------------------------------------------
 # ADVANCED (optional): also check exact store pages every 15 minutes.
