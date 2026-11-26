@@ -1,0 +1,23 @@
+# BACKEND FILE - you don't need to edit this.
+#
+# Direct store product links for the products in products.yaml, keyed by the
+# product name. The bot checks every link here every 15 minutes, in addition to
+# searching Walmart/Target by name and watching Slickdeals.
+#
+# New products: if BRAVE_API_KEY is set, the bot finds links automatically and
+# remembers them. Otherwise, links can be added here by hand.
+
+Apple AirPods Pro 3:
+  - https://www.amazon.com/dp/B0FQFB8FMG
+  - https://www.walmart.com/ip/AirPods-Pro-3/17835006350
+  - https://www.target.com/p/ap2022-true-wireless-bluetooth-headphones/-/A-85978609
+  - https://www.costco.com/apple-airpods-pro-3,-wireless-earbuds,-active-noise-cancellation,-hearing-aid-feature,-heart-rate-sensing.product.4000404510.html
+  - url: https://www.bestbuy.com/product/apple-airpods-pro-3-wireless-active-noise-cancelling-earbuds-with-heart-rate-sensing-feature-white/JJGCQLYK5F
+    sku: 6376563
+
+Apple Watch Series 8:
+  - https://www.amazon.com/dp/B0BDHM49BJ   # GPS 41mm Midnight
+  - https://www.amazon.com/dp/B0BDHZGHPD   # GPS 41mm Silver
+  - https://www.amazon.com/dp/B0BDJDH2WR   # GPS 45mm Midnight
+  - https://www.amazon.com/dp/B0BDHT81P4   # GPS 45mm Starlight
+  - https://www.walmart.com/ip/Apple-Watch-Series-8-GPS-41mm-Midnight-Aluminum-Case-Midnight-Sport-Band-S-M-Fitness-Tracker-Blood-Oxygen-ECG-Apps-Always-On-Retina-Display/1553851139

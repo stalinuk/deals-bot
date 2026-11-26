@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# DealsBot watch list.  One line per product:   Product name: target price
+# You get a phone notification when a deal at or below that price shows up.
+# ---------------------------------------------------------------------------
+
+products:
+  Apple AirPods Pro 3: 140
+  Apple Watch Series 8: 200
+
+
+# ---------------------------------------------------------------------------
+# Settings (optional - the defaults are fine)
+# ---------------------------------------------------------------------------
+settings:
+  ntfy_server: https://ntfy.sh   # your topic name goes in the NTFY_TOPIC secret
+  realert_hours: 12              # remind again about the same store price after 12 h (0 = never)
+  notify_errors: true            # warn me if a store link keeps failing
+  error_alert_after: 12          # ...after 12 failed checks in a row (~3 h at 15 min)
+  search_stores: [Walmart, Target]   # stores searched by product name every 15 min
+
+
+# ---------------------------------------------------------------------------
+# ADVANCED (optional): also check exact store pages every 15 minutes.
+# Use this long form instead of the one-line form for a product, e.g.:
+#
+# products:
+#   - name: Apple AirPods Pro 3
+#     target_price: 129
+#     stores:
+#       - https://www.amazon.com/dp/B0FQFB8FMG
+#       - https://www.walmart.com/ip/AirPods-Pro-3/17835006350
+#       - https://www.target.com/p/ap2022-true-wireless-bluetooth-headphones/-/A-85978609
+#       - https://www.costco.com/apple-airpods-pro-3,-wireless-earbuds,-active-noise-cancellation,-hearing-aid-feature,-heart-rate-sensing.product.4000404510.html
+#       - url: https://www.bestbuy.com/product/apple-airpods-pro-3-wireless-active-noise-cancelling-earbuds-with-heart-rate-sensing-feature-white/JJGCQLYK5F
+#         sku: 6376563             # Best Buy needs BESTBUY_API_KEY
+#   - Apple Watch Series 8: 200    # one-line and long form can be mixed
+# ---------------------------------------------------------------------------
