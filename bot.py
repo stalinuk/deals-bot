@@ -265,7 +265,7 @@ def _alert_posts(heading, state_key, label_name, min_pct, finder, cfg, settings,
         return
     new = [d for d in deals if d.id not in seen]
     if not new:
-        print(f"  {label} {len(deals)} matching post(s), none new")
+        print(f"  {label} {discount_watch.last_scanned} post(s) scanned, {len(deals)} matching, none new")
         return
     new.sort(key=lambda d: -d.discount)
 

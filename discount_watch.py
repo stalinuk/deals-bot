@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import slickdeals
+
+last_scanned = 0  # posts read by the most recent find_* call (shown in the log)
 from matching import CONDITION_WORDS
 from scrapers import parse_price
 
@@ -114,6 +116,8 @@ def discount_percent(title: str, price: float | None) -> int | None:
 def find_deals(cfg: dict) -> list[DiscountDeal]:
     min_pct = int(cfg.get("min_discount", 50))
     max_age_h = float(cfg.get("max_age_hours", 72))
+    global last_scanned
+    last_scanned = 0
     seen_ids = set()
     result = []
     for query in cfg.get("queries") or ["Apple"]:
@@ -121,6 +125,7 @@ def find_deals(cfg: dict) -> list[DiscountDeal]:
             if d.id in seen_ids:
                 continue
             seen_ids.add(d.id)
+            last_scanned += 1
             if d.posted and (datetime.now(timezone.utc) - d.posted).total_seconds() > max_age_h * 3600:
                 continue
             if not is_brand_product(d.title):
@@ -136,6 +141,8 @@ def find_hot_deals(cfg: dict) -> list[DiscountDeal]:
     min_pct = int(cfg.get("min_discount", 70))
     want_free = cfg.get("include_free", True)
     max_age_h = float(cfg.get("max_age_hours", 24))
+    global last_scanned
+    last_scanned = 0
     seen_ids = set()
     result = []
     for url in cfg.get("feeds") or slickdeals.ALL_DEALS_FEEDS:
@@ -143,6 +150,7 @@ def find_hot_deals(cfg: dict) -> list[DiscountDeal]:
             if d.id in seen_ids or d.title in seen_ids:
                 continue
             seen_ids.update((d.id, d.title))
+            last_scanned += 1
             if d.posted and (datetime.now(timezone.utc) - d.posted).total_seconds() > max_age_h * 3600:
                 continue
             t = d.title.lower()
