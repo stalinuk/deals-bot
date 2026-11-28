@@ -283,26 +283,33 @@ def _alert_posts(heading, state_key, label_name, min_pct, finder, cfg, settings,
 
     for d in new:
         print(f"  {label} {tag(d)}  NEW POST: {d.title[:90]}")
+    # 3 deals per notification (ntfy's button limit), one numbered button per deal
+    size = notifier.MAX_BUTTONS
+    chunks = [new[i:i + size] for i in range(0, len(new), size)]
     if dry_run:
-        print(f"  {label} (dry run - would send 1 notification for {len(new)} post(s))")
+        print(f"  {label} (dry run - would send {len(chunks)} notification(s), one button per deal)")
         return
     best = new[0]
-    if len(new) == 1:
-        title = f"{label_name}: {tag(best)}"
-        body = f"{best.title}\nTap to open the deal post."
-    else:
-        title = f"{label_name}: {len(new)} new deals (best: {tag(best)})"
-        body = "\n".join(f"- {tag(d)}: {d.title[:80]}" for d in new[:8])
-        if len(new) > 8:
-            body += f"\n...and {len(new) - 8} more"
-        body += "\nTap to open the top one."
-    sent = notifier.send(
-        title, body, click_url=best.link, priority=cfg.get("priority", "urgent"),
-        tags="moneybag,fire", server=settings["ntfy_server"],
-    )
-    print(f"  {label} 1 notification for {len(new)} post(s) -> {'sent' if sent else 'FAILED'}")
-    if sent:
-        seen.extend(d.id for d in new)
+    for n, chunk in enumerate(chunks, 1):
+        if len(new) == 1:
+            title = f"{label_name}: {tag(best)}"
+            body = best.title
+            buttons = [(f"Open deal ({tag(best)})", best.link)]
+        else:
+            part = f" ({n}/{len(chunks)})" if len(chunks) > 1 else ""
+            title = f"{label_name}: {len(new)} new deals (best: {tag(best)}){part}"
+            first = (n - 1) * size + 1
+            body = "\n".join(f"{first + i}) {tag(d)}: {d.title[:80]}" for i, d in enumerate(chunk))
+            buttons = [(f"{first + i}) {tag(d)}", d.link) for i, d in enumerate(chunk)]
+        sent = notifier.send(
+            title, body, click_url=chunk[0].link, buttons=buttons,
+            priority=cfg.get("priority", "urgent"), tags="moneybag,fire",
+            server=settings["ntfy_server"],
+        )
+        print(f"  {label} notification {n}/{len(chunks)} ({len(chunk)} deal button(s)) -> "
+              f"{'sent' if sent else 'FAILED'}")
+        if sent:
+            seen.extend(d.id for d in chunk)
     del seen[:-500]
 
 
