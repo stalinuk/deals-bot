@@ -167,7 +167,6 @@ def handle_result(
         f"{money(result.price)} at {result.store} - your target is {money(target)}.",
         f"Previous price: {money(previous)}" if previous and previous != result.price else None,
         stock,
-        "Tap to open the deal.",
     ]
     title = f"Price drop: {product['name']} {money(result.price)}"
     if dry_run:
@@ -176,6 +175,7 @@ def handle_result(
         title,
         "\n".join(l for l in lines if l),
         click_url=result.url,
+        buttons=[(f"Open at {result.store}", result.url)],
         priority=product.get("priority", "urgent"),
         tags="moneybag,tada",
         server=settings["ntfy_server"],
@@ -206,31 +206,40 @@ def check_slickdeals(product: dict, state: dict, settings: dict, dry_run: bool) 
     target = money(float(product["target_price"]))
     for deal in new:
         print(f"  {label} {money(deal.price)}  NEW POST: {deal.title[:90]}")
+    # ntfy allows 3 buttons per notification -> 3 deals per notification,
+    # each with its own "Open" button (numbered to match the list).
+    size = notifier.MAX_BUTTONS
+    chunks = [new[i:i + size] for i in range(0, len(new), size)]
     if dry_run:
-        print(f"  {label} (dry run - would send 1 notification for {len(new)} post(s))")
+        print(f"  {label} (dry run - would send {len(chunks)} notification(s), one button per deal)")
         return
 
-    if len(new) == 1:
-        title = f"Slickdeals: {product['name']} {money(best.price)}"
-        body = f"{best.title}\nYour target is {target}.\nTap to open the deal post."
-    else:
-        title = f"Slickdeals: {len(new)} deals on {product['name']} from {money(best.price)}"
-        shown = new[:8]
-        body = "\n".join(f"- {money(d.price)}: {d.title[:80]}" for d in shown)
-        if len(new) > len(shown):
-            body += f"\n...and {len(new) - len(shown)} more"
-        body += f"\nYour target is {target}. Tap to open the cheapest post."
-    sent = notifier.send(
-        title,
-        body,
-        click_url=best.link,
-        priority=product.get("priority", "urgent"),
-        tags="fire,moneybag",
-        server=settings["ntfy_server"],
-    )
-    print(f"  {label} 1 notification for {len(new)} post(s) -> {'sent' if sent else 'FAILED'}")
-    if sent:
-        seen.extend(d.id for d in new)
+    for n, chunk in enumerate(chunks, 1):
+        if len(new) == 1:
+            title = f"Slickdeals: {product['name']} {money(best.price)}"
+            body = f"{best.title}\nYour target is {target}."
+            buttons = [(f"Open {money(best.price)} deal", best.link)]
+        else:
+            part = f" ({n}/{len(chunks)})" if len(chunks) > 1 else ""
+            title = f"Slickdeals: {len(new)} deals on {product['name']} from {money(best.price)}{part}"
+            first = (n - 1) * size + 1
+            body = "\n".join(
+                f"{first + i}) {money(d.price)}: {d.title[:80]}" for i, d in enumerate(chunk)
+            ) + f"\nYour target is {target}."
+            buttons = [(f"{first + i}) {money(d.price)}", d.link) for i, d in enumerate(chunk)]
+        sent = notifier.send(
+            title,
+            body,
+            click_url=chunk[0].link,
+            buttons=buttons,
+            priority=product.get("priority", "urgent"),
+            tags="fire,moneybag",
+            server=settings["ntfy_server"],
+        )
+        print(f"  {label} notification {n}/{len(chunks)} ({len(chunk)} deal button(s)) -> "
+              f"{'sent' if sent else 'FAILED'}")
+        if sent:
+            seen.extend(d.id for d in chunk)
     del seen[:-300]  # keep the list small
 
 
