@@ -36,6 +36,7 @@ DEFAULT_SETTINGS = {
     "search_stores": ["Walmart", "Target"],  # stores searched by product name
     "discount_watch": None,   # e.g. {"brand": "Apple", "min_discount": 50}
     "hot_deals": None,        # e.g. {"min_discount": 70, "include_free": True}
+    "category_watch": None,   # list of {"name", "queries", "size_inches", "match_all", "min_discount"}
 }
 
 
@@ -244,7 +245,8 @@ def check_slickdeals(product: dict, state: dict, settings: dict, dry_run: bool) 
 
 
 def check_discount_watch(settings: dict, state: dict, dry_run: bool) -> None:
-    """Brand watch (any Apple product 50%+ off) and hot deals (anything 70%+ off or FREE)."""
+    """Brand watch (any Apple product 50%+ off), category watches (e.g. any 55" height-adjustable
+    table 50%+ off) and hot deals (anything 70%+ off or FREE)."""
     brand_cfg = settings.get("discount_watch")
     if brand_cfg and brand_cfg.get("enabled", True) is not False:
         brand = brand_cfg.get("brand", "Apple")
@@ -259,6 +261,16 @@ def check_discount_watch(settings: dict, state: dict, dry_run: bool) -> None:
             "Any product", "hot_deals", "Slickdeals",
             int(hot_cfg.get("min_discount", 70)), lambda: discount_watch.find_hot_deals(hot_cfg),
             hot_cfg, settings, state, dry_run,
+        )
+    cats = settings.get("category_watch") or []
+    for cat_cfg in [cats] if isinstance(cats, dict) else cats:
+        if not cat_cfg or cat_cfg.get("enabled", True) is False or not cat_cfg.get("name"):
+            continue
+        _alert_posts(
+            f"Any {cat_cfg['name']}", f"category:{cat_cfg['name']}", cat_cfg["name"],
+            int(cat_cfg.get("min_discount", 50)),
+            lambda c=cat_cfg: discount_watch.find_category_deals(c),
+            cat_cfg, settings, state, dry_run,
         )
 
 
@@ -316,7 +328,9 @@ def _alert_posts(heading, state_key, label_name, min_pct, finder, cfg, settings,
 def run_once(config_path: Path, state_path: Path, dry_run: bool) -> int:
     settings, products = load_config(config_path)
     state = load_state(state_path)
-    if not products and not (settings.get("discount_watch") or settings.get("hot_deals")):
+    if not products and not (
+        settings.get("discount_watch") or settings.get("hot_deals") or settings.get("category_watch")
+    ):
         print("No products configured in products.yaml")
         return 0
 

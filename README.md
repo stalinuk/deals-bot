@@ -89,6 +89,20 @@ used, open-box, and case/cover posts are skipped. Amounts like "$100 off" or "$2
 card" aren't counted as the price. Turn it on per product with the `slickdeals:` block in
 `products.yaml`.
 
+### Category watch (e.g. any 55" height-adjustable table at 50% off)
+
+`category_watch` in `products.yaml` alerts you about **any** product in a category, not
+only one model. The default entry watches Slickdeals for 55" height-adjustable / standing
+desks and tables that are **50% off or more**. A post counts when its title:
+
+- shows the size: `55"`, `55 in`, `55-inch`, `55x28`, `24 x 55`, or about 140 cm;
+- names a desk or table **and** says height adjustable, standing, sit-stand, electric, or
+  motorized;
+- shows the discount: "$119 (Reg. $299)", "55% off", or "$99, Save $150";
+- isn't a converter, riser, mat, TV, chair, refurbished, or used item.
+
+Each post alerts you only once. To watch another category, add another `- name:` entry.
+
 ## How alerts behave
 
 | Situation | What happens |

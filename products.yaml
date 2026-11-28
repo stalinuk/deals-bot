@@ -26,6 +26,21 @@ settings:
     min_discount: 50                 # percent off
     queries: [Apple, AirPods, iPad, MacBook, iPhone]
 
+  # Alert for ANY product in a category posted on Slickdeals at 50% off or more.
+  # A post must show the size (55", 55 in, 55x24, 140 cm...) and one phrase
+  # from EACH match_all group in its title. Add more categories as more "- name:" entries.
+  category_watch:
+    - name: 55" height adjustable table
+      min_discount: 50               # percent off
+      size_inches: 55
+      queries: [standing desk, height adjustable desk, height adjustable table,
+                sit stand desk, electric standing desk, adjustable standing desk]
+      match_all:
+        - [desk, table, workstation]
+        - [height adjustable, adjustable height, standing, stand up, sit stand,
+           sit to stand, electric, motorized]
+      exclude: [converter, riser, mat, tv, monitor, chair, frame only, treadmill, lift top]
+
   # Alert for ANY new Slickdeals post (any product) that is 70% off or more, or FREE.
   hot_deals:
     min_discount: 70                 # percent off

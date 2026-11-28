@@ -163,3 +163,65 @@ def find_hot_deals(cfg: dict) -> list[DiscountDeal]:
             if pct is not None and pct >= min_pct:
                 result.append(DiscountDeal(d.id, d.title, d.link, d.price, pct))
     return result
+
+
+# ---------- Category watch: e.g. any 55" height-adjustable table at 50%+ off ----------
+
+def size_pattern(inches: float) -> re.Pattern:
+    """Matches a width like 55", 55'', 55 in, 55-inch, 55x24, 55 x 28, 24"x55", 140cm."""
+    n = re.escape(f"{inches:g}")
+    unit = r"(?:\"|''|”|″|\s*-?\s*in(?:ch(?:es)?)?\b|\s*-?\s*inch)"
+    parts = [
+        rf"(?<![\d.]){n}{unit}",                          # 55" / 55 inch / 55-in
+        rf"(?<![\d.$]){n}\s*{unit}?\s*[x×]\s*\d",          # 55x24 / 55" x 28
+        rf"\d\s*{unit}?\s*[x×]\s*{n}(?![\d.])",            # 24 x 55
+    ]
+    cm = round(inches * 2.54)
+    parts.append(rf"(?<![\d.])(?:{cm - 1}|{cm}|{cm + 1})\s*cm\b")  # 55" ~ 140 cm
+    return re.compile("|".join(parts), re.I)
+
+
+def _phrase(p: str) -> re.Pattern:
+    # "sit stand" also matches "sit-stand" / "sit/stand"
+    words = [re.escape(w) for w in re.split(r"[\s\-/]+", p.lower().strip()) if w]
+    return re.compile(r"\b" + r"[\s\-/]*".join(words) + r"\b", re.I)
+
+
+def category_title_ok(title: str, cfg: dict) -> bool:
+    t = title.lower()
+    if any(re.search(rf"\b{re.escape(w)}\b", t) for w in CONDITION_WORDS):
+        return False
+    if any(_phrase(w).search(t) for w in cfg.get("exclude") or ()):
+        return False
+    if cfg.get("size_inches") and not size_pattern(float(cfg["size_inches"])).search(title):
+        return False
+    # every group needs at least one of its phrases in the title
+    for group in cfg.get("match_all") or ():
+        group = [group] if isinstance(group, str) else group
+        if not any(_phrase(p).search(t) for p in group):
+            return False
+    return True
+
+
+def find_category_deals(cfg: dict) -> list[DiscountDeal]:
+    """New Slickdeals posts in a product category (from search queries) at >= min_discount% off."""
+    min_pct = int(cfg.get("min_discount", 50))
+    max_age_h = float(cfg.get("max_age_hours", 72))
+    global last_scanned
+    last_scanned = 0
+    seen_ids = set()
+    result = []
+    for query in cfg.get("queries") or [cfg["name"]]:
+        for d in slickdeals.search(query):
+            if d.id in seen_ids:
+                continue
+            seen_ids.add(d.id)
+            last_scanned += 1
+            if d.posted and (datetime.now(timezone.utc) - d.posted).total_seconds() > max_age_h * 3600:
+                continue
+            if not category_title_ok(d.title, cfg):
+                continue
+            pct = discount_percent(d.title, d.price)
+            if pct is not None and pct >= min_pct:
+                result.append(DiscountDeal(d.id, d.title, d.link, d.price, pct))
+    return result
